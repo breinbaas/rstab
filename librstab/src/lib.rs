@@ -55,11 +55,20 @@ mod tests {
     use super::*;
 
     #[test]
-    fn read_file() {
+    fn test_geometry_from_json_file() {
         let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         d.push("testdata/1.json");
         let geometry: Geometry = Geometry::from_json_file(d);
         assert_eq!(geometry.layers.len(), 1);
         assert_eq!(geometry.layers[0].points.len(), 6);
+    }
+
+    #[test]
+    fn test_bishop() {
+        let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        d.push("testdata/1.json");
+        let geometry: Geometry = Geometry::from_json_file(d);
+
+        let _fmin = bishop(geometry, 18.0, 66.0, 85.0);
     }
 }
