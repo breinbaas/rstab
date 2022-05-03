@@ -1,10 +1,10 @@
-use librstab;
+//use librstab;
 
 fn main() {
     let num = 10;
     println!(
-        "Hello, world! {} plus one is {}!",
+        "Hello, world! {}!",
         num,
-        librstab::add_one(num)
+        //librstab::add_one(num)
     );
 }
