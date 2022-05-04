@@ -1,10 +1,11 @@
-use std::env;
+// use std::env;
 use std::fs::File;
 use std::path::PathBuf;
 
-use geo_clipper::Clipper;
-use geo_types::{Coordinate, LineString, Polygon};
+// use geo_clipper::Clipper;
+// use geo_types::{Coordinate, LineString, Polygon};
 
+use assert_approx_eq::assert_approx_eq;
 use serde::{Deserialize, Serialize};
 
 const EPS: f64 = 1e-14;
@@ -12,7 +13,7 @@ const EPS: f64 = 1e-14;
 #[derive(Serialize, Deserialize)]
 pub struct Point {
     x: f64,
-    z: f64,
+    y: f64,
 }
 
 pub struct Line {
@@ -30,103 +31,116 @@ struct Layer {
 }
 
 impl Line {
-    pub fn circle_intersections(&self, mx: f64, mz: f64, r: f64, segment: bool) -> Vec<Point> {
+    pub fn circle_intersections(&self, mx: f64, my: f64, r: f64, segment: bool) -> Vec<Point> {
         let mut intersections: Vec<Point> = Vec::new();
 
         let x0 = mx;
-        let z0 = mz;
+        let y0 = my;
         let x1 = self.p1.x;
-        let z1 = self.p1.z;
+        let y1 = self.p1.y;
         let x2 = self.p2.x;
-        let z2 = self.p2.z;
+        let y2 = self.p2.y;
 
-        let A = z2 - z1;
-        let B = x1 - x2;
-        let C = x2 * z1 - x1 * z2;
+        let ca = y2 - y1;
+        let cb = x1 - x2;
+        let cc = x2 * y1 - x1 * y2;
 
-        let a = A.sqrt() + B.sqrt();
+        let a = ca.powi(2) + cb.powi(2);
         let mut b = 0.0;
         let mut c = 0.0;
         let mut bnz = true;
 
-        if B.abs() >= EPS {
-            b = 2.0 * (A * C + A * B * z0 - B.sqrt() * x0);
-            c = C.sqrt() + 2.0 * B * C * z0 - B.sqrt() * (r.sqrt() - x0.sqrt() - z0.sqrt());
+        if cb.abs() >= EPS {
+            b = 2.0 * (ca * cc + ca * cb * y0 - cb.powi(2) * x0);
+            c = cb.powi(2) + 2.0 * cb * cc * y0
+                - cb.powi(2) * (r.powi(2) - x0.powi(2) - y0.powi(2));
         } else {
-            b = 2.0 * (B * C + A * B * x0 - A.sqrt() * z0);
-            c = C.sqrt() + 2.0 * A * C * x0 - A.sqrt() * (r.sqrt() - x0.sqrt() - z0.sqrt());
+            b = 2.0 * (cb * cc + ca * cb * x0 - ca.powi(2) * y0);
+            c = ca.powi(2) + 2.0 * ca * cc * x0
+                - ca.powi(2) * (r.powi(2) - x0.powi(2) - y0.powi(2));
             bnz = false;
         }
-        let mut d = b.sqrt() - 4.0 * a * c;
+        let mut d = b.powi(2) - 4.0 * a * c;
         if d < 0.0 {
             return intersections;
         }
 
-        fn within(x: f64, z: f64, x1: f64, z1: f64, x2: f64, z2: f64) -> bool {
-            let d1 = ((x2 - x1).sqrt() + (z2 - z1).sqrt()).sqrt(); // distance between end-points
-            let d2 = ((x - x1).sqrt() + (z - z1).sqrt()).sqrt(); // distance from point to one end
-            let d3 = ((x2 - x).sqrt() + (z2 - z).sqrt()).sqrt(); // distance from point to other end
+        fn within(x: f64, y: f64, x1: f64, y1: f64, x2: f64, y2: f64) -> bool {
+            let d1 = ((x2 - x1).powi(2) + (y2 - y1).powi(2)).sqrt(); // distance between end-points
+            let d2 = ((x - x1).powi(2) + (y - y1).powi(2)).sqrt(); // distance from point to one end
+            let d3 = ((x2 - x).powi(2) + (y2 - y).powi(2)).sqrt(); // distance from point to other end
             let delta = d1 - d2 - d3;
             return delta.abs() < EPS;
         }
 
-        fn fx(x: f64, A: f64, B: f64, C: f64) -> f64 {
-            -(A * x + C) / B
+        fn fx(x: f64, ca: f64, cb: f64, cc: f64) -> f64 {
+            -(ca * x + cc) / cb
         }
 
-        fn fz(z: f64, A: f64, B: f64, C: f64) -> f64 {
-            -(B * z + C) / A
+        fn fy(y: f64, ca: f64, cb: f64, cc: f64) -> f64 {
+            -(cb * y + cc) / ca
         }
 
-        if (d == 0.0) {
+        fn rxy(
+            x: f64,
+            y: f64,
+            x1: f64,
+            y1: f64,
+            x2: f64,
+            y2: f64,
+            segment: bool,
+            intersections: &mut Vec<Point>,
+        ) {
+            if !segment || within(x, y, x1, y1, x2, y2) {
+                let point = Point { x: x, y: y };
+                intersections.push(point);
+            }
+        }
+
+        if d == 0.0 {
             if bnz {
                 let x = -b / (2.0 * a);
-                let z = fx(x, A, B, C);
-                let point = Point { x: x, z: z };
-                intersections.push(point);
+                let y = fx(x, ca, cb, cc);
+                rxy(x, y, x1, y1, x2, y2, segment, &mut intersections);
             } else {
-                let z = -b / (2.0 * a);
-                let x = fz(z, A, B, C);
-                let point = Point { x: x, z: z };
-                intersections.push(point);
+                let y = -b / (2.0 * a);
+                let x = fy(y, ca, cb, cc);
+                rxy(x, y, x1, y1, x2, y2, segment, &mut intersections);
             }
         } else {
             d = d.sqrt();
             if bnz {
                 let x = (-b + d) / (2.0 * a);
-                let z = fx(x, A, B, C);
-                let point = Point { x: x, z: z };
-                intersections.push(point);
+                let y = fx(x, ca, cb, cc);
+                rxy(x, y, x1, y1, x2, y2, segment, &mut intersections);
                 let x = (-b - d) / (2.0 * a);
-                let z = fx(x, A, B, C);
-                let point = Point { x: x, z: z };
-                intersections.push(point);
+                let y = fx(x, ca, cb, cc);
+                rxy(x, y, x1, y1, x2, y2, segment, &mut intersections);
             } else {
-                let z = (-b + d) / (2.0 * a);
-                let x = fz(z, A, B, C);
-                let point = Point { x: x, z: z };
-                intersections.push(point);
-                let z = (-b - d) / (2.0 * a);
-                let x = fz(z, A, B, C);
-                let point = Point { x: x, z: z };
-                intersections.push(point);
+                let y = (-b + d) / (2.0 * a);
+                let x = fy(y, ca, cb, cc);
+                rxy(x, y, x1, y1, x2, y2, segment, &mut intersections);
+                let y = (-b - d) / (2.0 * a);
+                let x = fy(y, ca, cb, cc);
+                rxy(x, y, x1, y1, x2, y2, segment, &mut intersections);
             }
         }
 
+        intersections.sort_unstable_by(|a, b| a.x.partial_cmp(&b.x).unwrap());
         intersections
     }
 }
 
 // impl Layer {
-//     pub fn circle_intersections(&self, mx: f64, mz: f64, r: f64) -> Vec<Point> {
+//     pub fn circle_intersections(&self, mx: f64, my: f64, r: f64) -> Vec<Point> {
 //         let mut intersections = vec![];
 
-//         let circle = Circle::new((mx, mz), r);
+//         let circle = Circle::new((mx, my), r);
 
 //         for i in 1..self.points.len() {
 //             let line = Line::new(
-//                 (self.points[i - 1].x, self.points[i - 1].z),
-//                 (self.points[i].x, self.points[i].z),
+//                 (self.points[i - 1].x, self.points[i - 1].y),
+//                 (self.points[i].x, self.points[i].y),
 //             );
 
 //         }
@@ -138,7 +152,7 @@ impl Line {
 #[derive(Serialize, Deserialize)]
 struct Bishop {
     mx: f32,
-    mz: f32,
+    my: f32,
     r: f32,
 }
 
@@ -159,7 +173,7 @@ impl Geometry {
 //     polygon: Polygon,
 // }
 
-pub fn bishop(geometry: Geometry, mx: f32, mz: f32, r: f32) -> f32 {
+pub fn bishop(geometry: Geometry, mx: f32, my: f32, r: f32) -> f32 {
     0.1
 }
 
@@ -183,5 +197,58 @@ mod tests {
         let geometry: Geometry = Geometry::from_json_file(d);
 
         let _fmin = bishop(geometry, 18.0, 66.0, 85.0);
+    }
+
+    #[test]
+    fn test_circle_line_intersections() {
+        let mut p1 = Point { x: -10.0, y: 11.0 };
+        let mut p2 = Point { x: 10.0, y: -9.0 };
+        let mut mx = 3.0;
+        let mut my = -5.0;
+        let mut r = 3.0;
+
+        let mut line = Line { p1, p2 };
+
+        //
+        let result1 = line.circle_intersections(mx, my, r, false);
+        assert_eq!(result1.len(), 2);
+        assert_approx_eq!(result1[0].x, 3.0);
+        assert_approx_eq!(result1[0].y, -2.0);
+        assert_approx_eq!(result1[1].x, 6.0);
+        assert_approx_eq!(result1[1].y, -5.0);
+
+        //let result2 = line.circle_intersections(mx, my, r, true);
+        //assert_eq!(result2.len(), 0);
+
+        p1 = Point { x: 3.0, y: -2.0 };
+        p2 = Point { x: 7.0, y: -2.0 };
+        line = Line { p1, p2 };
+        let result3 = line.circle_intersections(mx, my, r, true);
+        //assert_eq!(result3.len(), 1);
+        //assert_approx_eq!(result3[0].x, 3.0);
+        //assert_approx_eq!(result3[0].y, -2.0);
+
+        p1 = Point { x: 0.0, y: -3.0 };
+        p2 = Point { x: 0.0, y: 6.0 };
+        line = Line { p1, p2 };
+        mx = 0.0;
+        my = 0.0;
+        r = 4.0;
+        let result4 = line.circle_intersections(mx, my, r, false);
+        assert_eq!(result4.len(), 2);
+        assert_approx_eq!(result4[0].x, 0.0);
+        assert_approx_eq!(result4[1].x, 0.0);
+
+        let result5 = line.circle_intersections(mx, my, r, true);
+        assert_eq!(result5.len(), 1);
+
+        p1 = Point { x: 0.0, y: -3.0 };
+        p2 = Point { x: 0.0, y: 6.0 };
+        line = Line { p1, p2 };
+        mx = 0.0;
+        my = 0.0;
+        r = 4.0;
+
+        let i = 1;
     }
 }
