@@ -21,6 +21,12 @@ pub struct Line {
     p2: Point,
 }
 
+pub struct Circle {
+    mx: f64,
+    my: f64,
+    r: f64,
+}
+
 #[derive(Serialize, Deserialize)]
 struct Layer {
     y_dry: f64,
@@ -131,23 +137,29 @@ impl Line {
     }
 }
 
-// impl Layer {
-//     pub fn circle_intersections(&self, mx: f64, my: f64, r: f64) -> Vec<Point> {
-//         let mut intersections = vec![];
+impl Layer {
+    pub fn circle_intersections(&self, mx: f64, my: f64, r: f64) -> Vec<Point> {
+        let mut intersections = vec![];
 
-//         let circle = Circle::new((mx, my), r);
+        for i in 1..self.points.len() {
+            let line = Line {
+                p1: Point {
+                    x: self.points[i - 1].x,
+                    y: self.points[i - 1].y,
+                },
+                p2: Point {
+                    x: self.points[i].x,
+                    y: self.points[i].y,
+                },
+            };
+            for intersection in line.circle_intersections(mx, my, r, true) {
+                intersections.push(intersection);
+            }
+        }
 
-//         for i in 1..self.points.len() {
-//             let line = Line::new(
-//                 (self.points[i - 1].x, self.points[i - 1].y),
-//                 (self.points[i].x, self.points[i].y),
-//             );
-
-//         }
-
-//         intersections
-//     }
-// }
+        intersections
+    }
+}
 
 #[derive(Serialize, Deserialize)]
 struct Bishop {
@@ -197,6 +209,28 @@ mod tests {
         let geometry: Geometry = Geometry::from_json_file(d);
 
         let _fmin = bishop(geometry, 18.0, 66.0, 85.0);
+    }
+
+    #[test]
+    fn test_layer_circle_intersections() {
+        let points = vec![
+            Point { x: 0.0, y: 0.0 },
+            Point { x: 10.0, y: 0.0 },
+            Point { x: 10.0, y: 10.0 },
+            Point { x: 0.0, y: 10.0 },
+            Point { x: 0.0, y: 0.0 }, // TODO > a layer should not have to be closed
+        ];
+        let layer = Layer {
+            y_dry: 10.0,
+            y_sat: 10.0,
+            c: 2.0,
+            phi: 15.0,
+            points: points,
+        };
+
+        let intersections = layer.circle_intersections(5.0, 5.0, 5.0);
+
+        assert_eq!(intersections.len(), 4);
     }
 
     #[test]
@@ -255,6 +289,6 @@ mod tests {
         let result7 = line.circle_intersections(4.0, 2.0, 5.0, true);
         assert_eq!(result7.len(), 1);
         assert_approx_eq!(result7[0].x, 8.0);
-        assert_approx_eq!(result7[0].y, 5.0); 
+        assert_approx_eq!(result7[0].y, 5.0);
     }
 }
