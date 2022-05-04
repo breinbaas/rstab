@@ -52,11 +52,11 @@ impl Line {
 
         if cb.abs() >= EPS {
             b = 2.0 * (ca * cc + ca * cb * y0 - cb.powi(2) * x0);
-            c = cb.powi(2) + 2.0 * cb * cc * y0
+            c = cc.powi(2) + 2.0 * cb * cc * y0
                 - cb.powi(2) * (r.powi(2) - x0.powi(2) - y0.powi(2));
         } else {
             b = 2.0 * (cb * cc + ca * cb * x0 - ca.powi(2) * y0);
-            c = ca.powi(2) + 2.0 * ca * cc * x0
+            c = cc.powi(2) + 2.0 * ca * cc * x0
                 - ca.powi(2) * (r.powi(2) - x0.powi(2) - y0.powi(2));
             bnz = false;
         }
@@ -203,52 +203,58 @@ mod tests {
     fn test_circle_line_intersections() {
         let mut p1 = Point { x: -10.0, y: 11.0 };
         let mut p2 = Point { x: 10.0, y: -9.0 };
-        let mut mx = 3.0;
-        let mut my = -5.0;
-        let mut r = 3.0;
 
-        let mut line = Line { p1, p2 };
+        let mut line = Line { p1: p1, p2: p2 };
 
         //
-        let result1 = line.circle_intersections(mx, my, r, false);
+        let result1 = line.circle_intersections(3.0, -5.0, 3.0, false);
         assert_eq!(result1.len(), 2);
         assert_approx_eq!(result1[0].x, 3.0);
         assert_approx_eq!(result1[0].y, -2.0);
         assert_approx_eq!(result1[1].x, 6.0);
         assert_approx_eq!(result1[1].y, -5.0);
 
-        //let result2 = line.circle_intersections(mx, my, r, true);
-        //assert_eq!(result2.len(), 0);
+        p1 = Point { x: -10.0, y: 11.0 };
+        p2 = Point { x: -11.0, y: -12.0 };
+        line = Line { p1: p1, p2: p2 };
+        let result2 = line.circle_intersections(3.0, -5.0, 3.0, true);
+        assert_eq!(result2.len(), 0);
 
         p1 = Point { x: 3.0, y: -2.0 };
         p2 = Point { x: 7.0, y: -2.0 };
         line = Line { p1, p2 };
-        let result3 = line.circle_intersections(mx, my, r, true);
-        //assert_eq!(result3.len(), 1);
-        //assert_approx_eq!(result3[0].x, 3.0);
-        //assert_approx_eq!(result3[0].y, -2.0);
+        let result3 = line.circle_intersections(3.0, -5.0, 3.0, true);
+        assert_eq!(result3.len(), 1);
+        assert_approx_eq!(result3[0].x, 3.0);
+        assert_approx_eq!(result3[0].y, -2.0);
 
         p1 = Point { x: 0.0, y: -3.0 };
         p2 = Point { x: 0.0, y: 6.0 };
         line = Line { p1, p2 };
-        mx = 0.0;
-        my = 0.0;
-        r = 4.0;
-        let result4 = line.circle_intersections(mx, my, r, false);
+        let result4 = line.circle_intersections(0.0, 0.0, 4.0, false);
         assert_eq!(result4.len(), 2);
         assert_approx_eq!(result4[0].x, 0.0);
         assert_approx_eq!(result4[1].x, 0.0);
 
-        let result5 = line.circle_intersections(mx, my, r, true);
+        let result5 = line.circle_intersections(0.0, 0.0, 4.0, true);
         assert_eq!(result5.len(), 1);
 
-        p1 = Point { x: 0.0, y: -3.0 };
-        p2 = Point { x: 0.0, y: 6.0 };
+        p1 = Point { x: 6.0, y: 3.0 };
+        p2 = Point { x: 10.0, y: 7.0 };
         line = Line { p1, p2 };
-        mx = 0.0;
-        my = 0.0;
-        r = 4.0;
+        let result6 = line.circle_intersections(4.0, 2.0, 5.0, false);
+        assert_eq!(result6.len(), 2);
+        assert_approx_eq!(result6[0].x, 1.0);
+        assert_approx_eq!(result6[0].y, -2.0);
+        assert_approx_eq!(result6[1].x, 8.0);
+        assert_approx_eq!(result6[1].y, 5.0);
 
-        let i = 1;
+        p1 = Point { x: 7.0, y: 4.0 };
+        p2 = Point { x: 11.0, y: 8.0 };
+        line = Line { p1, p2 };
+        let result7 = line.circle_intersections(4.0, 2.0, 5.0, true);
+        assert_eq!(result7.len(), 1);
+        assert_approx_eq!(result7[0].x, 8.0);
+        assert_approx_eq!(result7[0].y, 5.0); 
     }
 }
